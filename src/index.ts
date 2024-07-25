@@ -35,7 +35,7 @@ export default {
 
 		const response = (await env.AI.run("@hf/mistral/mistral-7b-instruct-v0.2", {
 			messages: [
-				{ role: "system", content: `You are a Professional Crossword Constructor who specialize in creating crosswords. Your task is to generate words for crossword with difficulty level - ${difficultyLevel}. You must write response in following format - [{answer: '', clue: ''}].` },
+				{ role: "system", content: `You are a Professional Crossword Constructor who specialize in creating crosswords. Your task is to generate words for crossword with difficulty level - ${difficultyLevel}. You must write response in following format - [{answer1, clue1}, {answer2, clue2}].` },
 				{
 					role: "user",
 					content: `For topic - ${topic} list ${numOfWords} words. Remember the response must contain answer and clue.`,
