@@ -14,14 +14,8 @@ interface JumblRequest {
 }
 export default {
 	async fetch(request, env): Promise<Response> {
-		// const numOfWords = 10;
-		// const topic = 'Cooking';
-		// const difficultyLevel = 'Medium'
-
-		const canvaAppId = 'AAGKAGwRQxo';
-
 		const corsHeaders = {
-			'Access-Control-Allow-Origin': `http://localhost:3000`,
+			'Access-Control-Allow-Origin': `*`,
 			'Access-Control-Allow-Methods': 'GET,HEAD,POST,OPTIONS',
 			'Access-Control-Max-Age': '86400',
 			'Access-Control-Allow-Headers': 'Content-Type',
@@ -29,6 +23,17 @@ export default {
 
 		if (request.method === 'OPTIONS') {
 			return new Response(null, { headers: corsHeaders });
+		}
+
+		const url = new URL(request.url)
+		const path = url.pathname
+
+		if(request.method === 'GET') {
+			const id = path.slice(1);
+			const savedCrossword = await env.jumbl.get(id);
+			return new Response(savedCrossword, {
+				headers: { 'Content-Type': 'application/json', ...corsHeaders },
+			});
 		}
 
 		if (request.method !== 'POST') {
@@ -51,7 +56,7 @@ export default {
 			return new Response(response.response, {
 				headers: { 'Content-Type': 'application/json', ...corsHeaders },
 			});
-		} else if (type === 'crossword') {
+		} else if (type === 'crossword-save') {
 			const crosswordData = {
 				users,
 				crossword,
