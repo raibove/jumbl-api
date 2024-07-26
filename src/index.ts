@@ -1,11 +1,16 @@
 export interface Env {
 	AI: Ai;
+	jumbl: KVNamespace
 }
 interface JumblRequest {
 	type: 'words';
 	topic: string;
 	numOfWords: string;
 	difficultyLevel: string;
+	users: { score: number, name: string }[],
+	crossword: Object,
+	id: string,
+	generatedBy: string,
 }
 export default {
 	async fetch(request, env): Promise<Response> {
@@ -31,20 +36,44 @@ export default {
 		}
 
 		const body: JumblRequest = await request.json();
-		const { type, topic, numOfWords, difficultyLevel} = body;
+		const { type, topic, numOfWords, difficultyLevel, users, crossword, generatedBy, id } = body;
+		if (type === 'words') {
+			const response = (await env.AI.run("@hf/mistral/mistral-7b-instruct-v0.2", {
+				messages: [
+					{ role: "system", content: `You are a Professional Crossword Constructor who specialize in creating crosswords. Your task is to generate words for crossword with difficulty level - ${difficultyLevel}. You must write response in following format - [{answer1, clue1}, {answer2, clue2}].` },
+					{
+						role: "user",
+						content: `For topic - ${topic} list ${numOfWords} words. Remember the response must contain answer and clue.`,
+					},
+				], stream: false
+			})) as { response: string };
 
-		const response = (await env.AI.run("@hf/mistral/mistral-7b-instruct-v0.2", {
-			messages: [
-				{ role: "system", content: `You are a Professional Crossword Constructor who specialize in creating crosswords. Your task is to generate words for crossword with difficulty level - ${difficultyLevel}. You must write response in following format - [{answer1, clue1}, {answer2, clue2}].` },
-				{
-					role: "user",
-					content: `For topic - ${topic} list ${numOfWords} words. Remember the response must contain answer and clue.`,
-				},
-			], stream: false
-		})) as { response: string };
+			return new Response(response.response, {
+				headers: { 'Content-Type': 'application/json', ...corsHeaders },
+			});
+		} else if (type === 'crossword') {
+			const crosswordData = {
+				users,
+				crossword,
+				generatedBy,
+				timestamp: new Date().toISOString()
+			};
 
-		return new Response(response.response, {
-			headers: { 'Content-Type': 'application/json', ...corsHeaders },
-		});
+			try {
+				console.Console
+				await env.jumbl.put(id, JSON.stringify(crosswordData));
+				return new Response(JSON.stringify({ message: 'Crossword data stored successfully' }), {
+					headers: { 'Content-Type': 'application/json', ...corsHeaders },
+				});
+			} catch (error) {
+				console.error('Error storing crossword data:', error);
+				return new Response(JSON.stringify({ error: 'Failed to store crossword data' }), {
+					status: 500,
+					headers: { 'Content-Type': 'application/json', ...corsHeaders },
+				});
+			}
+		}
+
+		return new Response('Please add valid type with post request', { status: 405, headers: corsHeaders });
 	},
 } satisfies ExportedHandler<Env>;
