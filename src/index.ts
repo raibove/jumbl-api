@@ -3,7 +3,7 @@ export interface Env {
 	jumbl: KVNamespace
 }
 interface JumblRequest {
-	type: 'words';
+	type: string;
 	topic: string;
 	numOfWords: string;
 	difficultyLevel: string;
@@ -11,6 +11,8 @@ interface JumblRequest {
 	crossword: Object,
 	id: string,
 	generatedBy: string,
+	inputWord: string,
+	inputQuestion: string
 }
 export default {
 	async fetch(request, env): Promise<Response> {
@@ -41,7 +43,7 @@ export default {
 		}
 
 		const body: JumblRequest = await request.json();
-		const { type, topic, numOfWords, difficultyLevel, users, crossword, generatedBy, id } = body;
+		const { type, topic, numOfWords, difficultyLevel, users, crossword, generatedBy, id, inputWord, inputQuestion } = body;
 		if (type === 'words') {
 			const response = (await env.AI.run("@hf/mistral/mistral-7b-instruct-v0.2", {
 				messages: [
@@ -80,6 +82,41 @@ export default {
 			} catch (error) {
 				console.error('Error storing crossword data:', error);
 				return new Response(JSON.stringify({ error: 'Failed to store crossword data' }), {
+					status: 500,
+					headers: { 'Content-Type': 'application/json', ...corsHeaders },
+				});
+			}
+		} else if (type === 'crossword-hint') {
+			try {
+				const messages = [
+					{
+						role: "system",
+						content: `You are a simple bot that only answers "yes" or "no" to questions.
+
+							Your task is to determine if the user's input is related to or asking about ${inputWord}. Respond as follows:
+								- If the user's input is asking about or related to the${inputWord}, respond with "yes"
+								- If the user's input is not related to or asking about the ${inputWord}, respond with "no"
+
+								Do not provide any explanation or additional text. Only respond with "yes" or "no".
+					`},
+					{
+						role: "user",
+						content: inputQuestion,
+					},
+				];
+				const response = (await env.AI.run("@cf/meta/llama-2-7b-chat-fp16", { messages, stream: false })) as { response: string };
+				console.log(response)
+				let cleanedStr = response.response.replace(/[^a-zA-Z0-9\s]/g, '').toLowerCase();
+				let match = cleanedStr.match(/\b(yes|no)\b/);
+				if(!match){
+					throw new Error('Failed to get hint');
+				}
+				return new Response(match[0], {
+					headers: { 'Content-Type': 'application/json', ...corsHeaders },
+				});
+			} catch (err) {
+				console.error('Error storing crossword data:', err);
+				return new Response(JSON.stringify({ error: 'Failed to get hint' }), {
 					status: 500,
 					headers: { 'Content-Type': 'application/json', ...corsHeaders },
 				});
